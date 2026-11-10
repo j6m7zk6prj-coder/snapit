@@ -1,0 +1,55 @@
+name: Build Snapit.exe
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compiler en un seul .exe autonome
+        run: >
+          dotnet publish src/Snapit.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:DebugType=None
+          -p:Version=1.0.${{ github.run_number }}
+          -o out
+
+      - name: Artefact de l’action
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snapit
+          path: out/Snapit.exe
+
+      - name: Publier la release (lien de téléchargement direct)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Snapit 1.0.${{ github.run_number }}
+          make_latest: true
+          files: out/Snapit.exe
+          body: |
+            Téléchargez **Snapit.exe** ci-dessous et lancez-le — aucune installation nécessaire.
+
+            - **Ctrl + Maj + 4** : zone (glisser) ou fenêtre (clic)
+            - **Ctrl + Maj + 3** : écran entier
+            - **Ctrl + Maj + 5** : panneau de capture (minuteur)

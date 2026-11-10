@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Snapit</RootNamespace>
+    <AssemblyName>Snapit</AssemblyName>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+    <ApplicationDefaultFont>Segoe UI, 9pt</ApplicationDefaultFont>
+    <Product>Snapit</Product>
+    <Version>1.0.0</Version>
+    <Copyright>Snapit</Copyright>
+    <SatelliteResourceLanguages>fr</SatelliteResourceLanguages>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);WFO1000;WFO5001;WFDEV005;CA1416;SYSLIB0050</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\icon.ico" LogicalName="Snapit.icon.ico" />
+  </ItemGroup>
+
+</Project>
