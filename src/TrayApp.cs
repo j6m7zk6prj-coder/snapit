@@ -16,7 +16,8 @@ sealed class TrayApp : ApplicationContext
 
     OverlayForm overlay;
     PreviewToast toast;
-    CapturePanel panel;
+    MainWindow main;
+    bool restoreMain, hintShown;
     SettingsForm settingsForm;
 
     readonly Control invoker = new Control();
@@ -38,7 +39,8 @@ sealed class TrayApp : ApplicationContext
         };
         menu.Items.Add(Item("Capturer une zone ou une fenêtre", "Ctrl+Maj+4", StartRegion));
         menu.Items.Add(Item("Capturer l’écran entier", "Ctrl+Maj+3", StartFullScreen));
-        menu.Items.Add(Item("Panneau de capture…", "Ctrl+Maj+5", ShowPanel));
+        menu.Items.Insert(0, Item("Ouvrir Snapit", "Ctrl+Maj+5", ShowMain));
+        menu.Items.Insert(1, new ToolStripSeparator());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(Item("Ouvrir le dossier des captures", null, OpenFolder));
         menu.Items.Add(Item("Réglages…", null, ShowSettings));
@@ -53,7 +55,7 @@ sealed class TrayApp : ApplicationContext
             ContextMenuStrip = menu,
             Visible = true,
         };
-        tray.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) StartRegion(); };
+        tray.MouseClick += (s, e) => { if (e.Button == MouseButtons.Left) ShowMain(); };
 
         hotkeys = new HotkeyWindow();
         hotkeys.Pressed += OnHotkey;
@@ -62,7 +64,7 @@ sealed class TrayApp : ApplicationContext
         // Relancer Snapit (menu Démarrer, double-clic sur l'exe) = afficher le panneau.
         showWait = ThreadPool.RegisterWaitForSingleObject(showEvent, (st, timedOut) =>
         {
-            try { invoker.BeginInvoke(new Action(ShowPanel)); } catch { }
+            try { invoker.BeginInvoke(new Action(ShowMain)); } catch { }
         }, null, Timeout.Infinite, false);
 
         if (settings.FirstRun)
@@ -74,7 +76,7 @@ sealed class TrayApp : ApplicationContext
         }
 
         // Ouverture manuelle : on montre tout de suite quelque chose (comme Capture d'écran sur Mac).
-        if (!silent) Delay(250, ShowPanel);
+        if (!silent) ShowMain();
     }
 
     static ToolStripMenuItem Item(string text, string keys, Action action)
@@ -127,7 +129,7 @@ sealed class TrayApp : ApplicationContext
             case HK_FULL: StartFullScreen(); break;
             case HK_REGION:
             case HK_PRTSC: StartRegion(); break;
-            case HK_PANEL: ShowPanel(); break;
+            case HK_PANEL: ShowMain(); break;
         }
     }
 
@@ -136,9 +138,8 @@ sealed class TrayApp : ApplicationContext
     /// <summary>Ferme l'aperçu / le panneau avant de capturer pour qu'ils n'apparaissent pas sur l'image.</summary>
     void AfterClear(Action action)
     {
-        bool hadSomething = toast != null || panel != null;
+        bool hadSomething = toast != null;
         toast?.Close();
-        panel?.Close();
         if (hadSomething) Delay(160, action); else action();
     }
 
@@ -150,11 +151,11 @@ sealed class TrayApp : ApplicationContext
             if (overlay != null) return;
             Bitmap shot;
             try { shot = Capturer.CaptureVirtualScreen(); }
-            catch (Exception ex) { ShowError(ex); return; }
+            catch (Exception ex) { ShowError(ex); RestoreMain(); return; }
 
             overlay = new OverlayForm(shot, Native.GetWindowRects());
             overlay.Captured += OnCaptured;
-            overlay.FormClosed += (s, e) => overlay = null;
+            overlay.FormClosed += (s, e) => { overlay = null; RestoreMain(); };
             overlay.Show();
             overlay.Activate();
         });
@@ -167,6 +168,7 @@ sealed class TrayApp : ApplicationContext
         {
             try { OnCaptured(Capturer.Capture(Screen.FromPoint(Cursor.Position).Bounds)); }
             catch (Exception ex) { ShowError(ex); }
+            RestoreMain();
         });
     }
 
@@ -181,6 +183,7 @@ sealed class TrayApp : ApplicationContext
             catch (Exception ex) { tray.ShowBalloonTip(4000, "Enregistrement impossible", ex.Message, ToolTipIcon.Error); }
         }
         if (settings.CopyToClipboard) ClipboardHelper.SetImage(bmp);
+        if (path != null) main?.RefreshRecent();
 
         if (settings.ShowPreview) ShowToast(bmp, path);
         else bmp.Dispose();
@@ -199,41 +202,80 @@ sealed class TrayApp : ApplicationContext
     void OpenEditor(Bitmap bmp, string path)
     {
         var ed = new EditorForm(bmp, path, settings);
+        ed.FormClosed += (s, e) => main?.RefreshRecent();
         ed.Show();
         ed.Activate();
     }
 
     // ---------- Fenêtres ----------
 
-    void ShowPanel()
+    MainWindow GetMain()
     {
-        if (overlay != null) return;
-        if (panel != null) { panel.Activate(); return; }
-        toast?.Close();
-
-        panel = new CapturePanel();
-        panel.RunCapture += (mode, delay) =>
+        if (main != null && !main.IsDisposed) return main;
+        main = new MainWindow(settings);
+        main.CaptureRequested += (mode, delay) =>
         {
             Action run = mode == "screen" ? StartFullScreen : StartRegion;
-            Delay(160, () =>
+            restoreMain = true;
+            main.Hide();                      // la fenêtre ne doit pas apparaître sur la capture
+            Delay(220, () =>
             {
                 if (delay > 0) Countdown.Run(delay, run);
                 else run();
             });
         };
-        panel.OpenSettings += ShowSettings;
-        panel.OpenFolder += OpenFolder;
-        panel.FormClosed += (s, e) => panel = null;
-        panel.Show();
-        Native.SetForegroundWindow(panel.Handle);
-        panel.Activate();
+        main.OpenFolderRequested += OpenFolder;
+        main.SettingsRequested += ShowSettings;
+        main.OpenFileRequested += OpenFile;
+        main.HiddenToTray += () =>
+        {
+            if (hintShown) return;
+            hintShown = true;
+            tray.ShowBalloonTip(4000, "Snapit reste prêt",
+                "Ctrl+Maj+4 pour capturer à tout moment. Cliquez sur l’icône Snapit pour rouvrir la fenêtre.", ToolTipIcon.None);
+        };
+        return main;
+    }
+
+    void ShowMain()
+    {
+        if (overlay != null) return;
+        restoreMain = false;
+        GetMain().ShowAndActivate();
+    }
+
+    /// <summary>Après une capture lancée depuis la fenêtre : on la fait revenir.</summary>
+    void RestoreMain()
+    {
+        if (!restoreMain) return;
+        restoreMain = false;
+        Delay(120, () =>
+        {
+            if (main == null || main.IsDisposed) return;
+            main.Show();
+            if (main.WindowState == FormWindowState.Minimized) main.WindowState = FormWindowState.Normal;
+            main.RefreshRecent();
+        });
+    }
+
+    void OpenFile(string path)
+    {
+        try
+        {
+            Bitmap bmp;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var img = Image.FromStream(fs))
+                bmp = new Bitmap(img);
+            OpenEditor(bmp, path);
+        }
+        catch (Exception ex) { ShowError(ex); }
     }
 
     void ShowSettings()
     {
         if (settingsForm != null) { settingsForm.Activate(); return; }
         settingsForm = new SettingsForm(settings);
-        settingsForm.Saved += () => RegisterHotkeys();
+        settingsForm.Saved += () => { RegisterHotkeys(); main?.RefreshRecent(); };
         settingsForm.FormClosed += (s, e) => settingsForm = null;
         settingsForm.Show();
         settingsForm.Activate();
@@ -255,6 +297,7 @@ sealed class TrayApp : ApplicationContext
     void ExitApp()
     {
         showWait?.Unregister(null);
+        main?.ReallyClose();
         hotkeys.Dispose();
         tray.Visible = false;
         tray.Dispose();

@@ -9,7 +9,7 @@ Un seul fichier `Snapit.exe`, rien à installer.
 |---|---|
 | **Ctrl + Maj + 4** | Zone : glissez pour sélectionner — ou cliquez sur une fenêtre pour la capturer |
 | **Ctrl + Maj + 3** | Écran entier (l’écran où se trouve la souris) |
-| **Ctrl + Maj + 5** | Panneau de capture (mode, minuteur 3/5/10 s, options) |
+| **Ctrl + Maj + 5** | Ouvrir la fenêtre Snapit (captures récentes, minuteur 3/5/10 s) |
 | **Impr. écran** | Zone ou fenêtre (si la touche est libre, voir plus bas) |
 | **Échap** / clic droit | Annuler |
 
@@ -20,7 +20,7 @@ Après chaque capture :
 
 L’éditeur propose stylo (P), surligneur (H), flèche (A), rectangle (R), texte (T) et flou (B), avec Ctrl+Z, Ctrl+C, Ctrl+S. Fermer = modifications conservées.
 
-Icône dans la zone de notification : clic gauche = capturer, clic droit = menu (réglages, dossier, quitter).
+Icône dans la zone de notification : clic gauche = ouvrir la fenêtre Snapit, clic droit = menu (réglages, dossier, quitter).
 
 ## Obtenir le .exe avec GitHub Actions
 

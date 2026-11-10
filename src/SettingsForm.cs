@@ -85,7 +85,7 @@ sealed class SettingsForm : Form
         }
         Key("Ctrl + Maj + 3", "Écran entier");
         Key("Ctrl + Maj + 4", "Zone (glisser) ou fenêtre (clic)");
-        Key("Ctrl + Maj + 5", "Panneau de capture (minuteur…)");
+        Key("Ctrl + Maj + 5", "Ouvrir la fenêtre Snapit");
         Key("Impr. écran", "Zone ou fenêtre (si activé)");
         Key("Échap", "Annuler");
         flow.Controls.Add(keys);
