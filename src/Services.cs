@@ -55,7 +55,7 @@ public sealed class AppSettings
             try
             {
                 using var k = Registry.CurrentUser.OpenSubKey(RunKey, true) ?? Registry.CurrentUser.CreateSubKey(RunKey);
-                if (value) k.SetValue("Snapit", "\"" + Environment.ProcessPath + "\"");
+                if (value) k.SetValue("Snapit", "\"" + Environment.ProcessPath + "\" --startup");
                 else k.DeleteValue("Snapit", false);
             }
             catch { }

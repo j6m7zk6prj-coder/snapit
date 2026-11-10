@@ -19,8 +19,13 @@ sealed class TrayApp : ApplicationContext
     CapturePanel panel;
     SettingsForm settingsForm;
 
-    public TrayApp()
+    readonly Control invoker = new Control();
+    readonly RegisteredWaitHandle showWait;
+
+    public TrayApp(EventWaitHandle showEvent, bool silent)
     {
+        invoker.CreateControl();
+        _ = invoker.Handle;
         settings = AppSettings.Load();
         var trayIcon = LoadIcons();
 
@@ -54,15 +59,22 @@ sealed class TrayApp : ApplicationContext
         hotkeys.Pressed += OnHotkey;
         bool allOk = RegisterHotkeys();
 
+        // Relancer Snapit (menu Démarrer, double-clic sur l'exe) = afficher le panneau.
+        showWait = ThreadPool.RegisterWaitForSingleObject(showEvent, (st, timedOut) =>
+        {
+            try { invoker.BeginInvoke(new Action(ShowPanel)); } catch { }
+        }, null, Timeout.Infinite, false);
+
         if (settings.FirstRun)
         {
             settings.FirstRun = false;
             settings.Save();
-            if (allOk)
-                tray.ShowBalloonTip(6000, "Snapit est prêt",
-                    "Ctrl+Maj+4 : zone ou fenêtre\nCtrl+Maj+3 : écran entier\nCtrl+Maj+5 : panneau de capture",
-                    ToolTipIcon.None);
+            // Le lancement au démarrage de Windows est activé par défaut, comme une appli système.
+            AppSettings.StartWithWindows = true;
         }
+
+        // Ouverture manuelle : on montre tout de suite quelque chose (comme Capture d'écran sur Mac).
+        if (!silent) Delay(250, ShowPanel);
     }
 
     static ToolStripMenuItem Item(string text, string keys, Action action)
@@ -213,6 +225,7 @@ sealed class TrayApp : ApplicationContext
         panel.OpenFolder += OpenFolder;
         panel.FormClosed += (s, e) => panel = null;
         panel.Show();
+        Native.SetForegroundWindow(panel.Handle);
         panel.Activate();
     }
 
@@ -241,6 +254,7 @@ sealed class TrayApp : ApplicationContext
 
     void ExitApp()
     {
+        showWait?.Unregister(null);
         hotkeys.Dispose();
         tray.Visible = false;
         tray.Dispose();
